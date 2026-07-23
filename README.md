@@ -2,6 +2,8 @@
 
 > A seed-based reversible mojibake cipher that transforms text into garbled characters and restores it with the same seed.
 
+[![Live Demo](https://img.shields.io/badge/Live-Demo-blue?style=for-the-badge)](https://mojibake-cipher.pages.dev/)
+
 ![License](https://img.shields.io/badge/License-MIT-green)
 ![JavaScript](https://img.shields.io/badge/JavaScript-ES6-yellow)
 ![Status](https://img.shields.io/badge/Status-Stable-brightgreen)
