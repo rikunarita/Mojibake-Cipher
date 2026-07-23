@@ -1,0 +1,1098 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mojibake Cipher</title>
+<style>
+  :root{
+    --bg: #0a0f1a;
+    --bg-grid: #0d1422;
+    --surface: #111a2b;
+    --surface-2: #182337;
+    --surface-3: #1f2c45;
+    --border: rgba(148,163,196,0.14);
+    --border-strong: rgba(148,163,196,0.28);
+    --text: #e8edf7;
+    --text-dim: #8b96ac;
+    --text-faint: #5b6478;
+    --accent: #58e6c9;
+    --accent-dim: #2e6f63;
+    --accent-glow: rgba(88,230,201,0.35);
+    --accent2: #f2b25c;
+    --accent2-dim: #6f5a2e;
+    --accent2-glow: rgba(242,178,92,0.35);
+    --danger: #f2705c;
+    --radius: 14px;
+    --radius-sm: 9px;
+    --mono: "IBM Plex Mono", "SFMono-Regular", ui-monospace, Menlo, Consolas, "Noto Sans Mono CJK JP", monospace;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Kaku Gothic ProN", "Hiragino Sans", "Yu Gothic", "Noto Sans JP", "PingFang SC", "Microsoft YaHei", "Noto Sans SC", sans-serif;
+  }
+  *{ box-sizing: border-box; }
+  html,body{
+    margin:0; padding:0; background: var(--bg); color: var(--text);
+    font-family: var(--sans);
+    -webkit-font-smoothing: antialiased;
+  }
+  body{
+    min-height:100vh;
+    background-image:
+      linear-gradient(var(--bg-grid) 1px, transparent 1px),
+      linear-gradient(90deg, var(--bg-grid) 1px, transparent 1px);
+    background-size: 34px 34px;
+    background-position: center;
+  }
+  body::before{
+    content:"";
+    position: fixed; inset:0;
+    background: radial-gradient(ellipse 900px 500px at 50% -10%, rgba(88,230,201,0.08), transparent 60%);
+    pointer-events:none;
+  }
+  .wrap{
+    position:relative;
+    max-width: 1040px;
+    margin: 0 auto;
+    padding: 40px 24px 80px;
+  }
+  /* ---------- Header ---------- */
+  header.top{
+    display:flex;
+    align-items:flex-start;
+    justify-content:space-between;
+    gap:20px;
+    margin-bottom: 34px;
+    flex-wrap: wrap;
+  }
+  .brand{ display:flex; align-items:center; gap:14px; }
+  .brand-mark{
+    width:44px; height:44px; flex:0 0 auto;
+    border-radius: 11px;
+    background: linear-gradient(145deg, var(--surface-2), var(--surface));
+    border:1px solid var(--border-strong);
+    display:flex; align-items:center; justify-content:center;
+    box-shadow: 0 0 0 1px rgba(0,0,0,0.2) inset, 0 6px 18px rgba(0,0,0,0.35);
+  }
+  .brand-mark svg{ width:24px; height:24px; }
+  .brand-text .eyebrow{
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.16em;
+    color: var(--accent);
+    text-transform: uppercase;
+    margin:0 0 4px;
+  }
+  .brand-text h1{
+    font-size: 22px;
+    margin:0;
+    font-weight: 700;
+    letter-spacing: 0.01em;
+  }
+  .brand-text p{
+    margin: 4px 0 0;
+    color: var(--text-dim);
+    font-size: 13px;
+    max-width: 46ch;
+  }
+  .lang-switch{
+    display:flex; align-items:center; gap:6px;
+    background: var(--surface);
+    border:1px solid var(--border);
+    border-radius: 999px;
+    padding: 4px;
+  }
+  .lang-switch svg{ width:14px; height:14px; margin: 0 4px 0 8px; color: var(--text-faint); flex:0 0 auto; }
+  .lang-btn{
+    appearance:none; border:none; cursor:pointer;
+    background: transparent; color: var(--text-dim);
+    font-family: var(--mono); font-size: 12px; letter-spacing: 0.03em;
+    padding: 7px 12px; border-radius: 999px;
+    transition: background .15s ease, color .15s ease;
+  }
+  .lang-btn:hover{ color: var(--text); }
+  .lang-btn.active{ background: var(--surface-3); color: var(--text); box-shadow: inset 0 0 0 1px var(--border-strong); }
+
+  /* ---------- Mode toggle ---------- */
+  .mode-row{ display:flex; justify-content:center; margin-bottom: 30px; }
+  .mode-toggle{
+    display:flex;
+    background: var(--surface);
+    border:1px solid var(--border);
+    border-radius: 12px;
+    padding: 4px;
+    gap: 4px;
+  }
+  .mode-btn{
+    appearance:none; border:none; cursor:pointer;
+    background: transparent; color: var(--text-dim);
+    font-family: var(--sans); font-weight:600; font-size: 14px;
+    padding: 10px 22px; border-radius: 9px;
+    display:flex; align-items:center; gap:8px;
+    transition: background .18s ease, color .18s ease, box-shadow .18s ease;
+  }
+  .mode-btn svg{ width:16px; height:16px; }
+  .mode-btn[data-mode="encrypt"].active{
+    background: linear-gradient(145deg, rgba(88,230,201,0.16), rgba(88,230,201,0.06));
+    color: var(--accent);
+    box-shadow: inset 0 0 0 1px rgba(88,230,201,0.35);
+  }
+  .mode-btn[data-mode="decrypt"].active{
+    background: linear-gradient(145deg, rgba(242,178,92,0.16), rgba(242,178,92,0.06));
+    color: var(--accent2);
+    box-shadow: inset 0 0 0 1px rgba(242,178,92,0.35);
+  }
+
+  /* ---------- Signal path (signature element) ---------- */
+  .signal{
+    display:flex; align-items:center; justify-content:center;
+    gap: 0; margin-bottom: 36px; user-select:none;
+  }
+  .signal .node{
+    display:flex; flex-direction:column; align-items:center; gap:8px;
+    width: 108px;
+  }
+  .signal .node .dot{
+    width:46px; height:46px; border-radius:50%;
+    background: var(--surface);
+    border:1px solid var(--border-strong);
+    display:flex; align-items:center; justify-content:center;
+    transition: box-shadow .25s ease, border-color .25s ease;
+  }
+  .signal .node .dot svg{ width:20px; height:20px; color: var(--text-dim); transition: color .25s ease; }
+  .signal .node span{
+    font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.08em;
+    color: var(--text-faint); text-transform: uppercase; text-align:center;
+  }
+  .signal .track{
+    flex:1; height:1px; max-width: 90px; min-width: 32px;
+    background: repeating-linear-gradient(90deg, var(--border-strong) 0 6px, transparent 6px 11px);
+    position:relative; top:-16px;
+  }
+  .signal .track .pulse{
+    position:absolute; top:-2.5px; left:0; width:6px; height:6px; border-radius:50%;
+    background: var(--accent); box-shadow: 0 0 8px 2px var(--accent-glow);
+    opacity:0; transform: translateX(0);
+  }
+  .signal.running .track .pulse{
+    animation: travel 1.1s ease-in-out;
+  }
+  .signal.decrypt-run .track .pulse{ background: var(--accent2); box-shadow: 0 0 8px 2px var(--accent2-glow); }
+  @keyframes travel{
+    0%{ opacity:0; transform: translateX(0); }
+    10%{ opacity:1; }
+    90%{ opacity:1; }
+    100%{ opacity:0; transform: translateX(calc(100% - 6px)); }
+  }
+  .signal.running .node.active .dot,
+  .signal.decrypt-run .node.active .dot{
+    border-color: var(--accent);
+    box-shadow: 0 0 0 4px var(--accent-glow);
+  }
+  .signal.decrypt-run .node.active .dot{ border-color: var(--accent2); box-shadow: 0 0 0 4px var(--accent2-glow); }
+  .signal.running .node.active .dot svg,
+  .signal.decrypt-run .node.active .dot svg{ color: var(--accent); }
+  .signal.decrypt-run .node.active .dot svg{ color: var(--accent2); }
+
+  /* ---------- Cards / panels ---------- */
+  .panel{
+    background: linear-gradient(160deg, var(--surface), var(--bg-grid));
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px 22px;
+    margin-bottom: 18px;
+  }
+  .panel-head{
+    display:flex; align-items:center; justify-content:space-between;
+    margin-bottom: 12px; gap: 10px; flex-wrap:wrap;
+  }
+  .panel-head label{
+    font-size: 12px; letter-spacing: 0.04em; color: var(--text-dim);
+    font-weight: 600; text-transform: uppercase; font-family: var(--mono);
+  }
+  .panel-head .stats{
+    font-family: var(--mono); font-size: 11px; color: var(--text-faint);
+    display:flex; gap: 12px;
+  }
+  textarea{
+    width:100%; resize: vertical; min-height: 108px;
+    background: var(--bg); color: var(--text);
+    border: 1px solid var(--border); border-radius: var(--radius-sm);
+    padding: 12px 14px; font-family: var(--mono); font-size: 14.5px; line-height:1.6;
+    outline:none; transition: border-color .15s ease, box-shadow .15s ease;
+  }
+  textarea::placeholder{ color: var(--text-faint); }
+  textarea:focus{ border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-glow); }
+  textarea[readonly]{ cursor: text; }
+
+  .field-tools{
+    display:flex; align-items:center; gap:8px; margin-top:10px; flex-wrap:wrap;
+  }
+  .seed-row{ display:flex; gap:10px; align-items:stretch; }
+  .seed-row input[type="text"]{
+    flex:1; background: var(--bg); color: var(--text);
+    border:1px solid var(--border); border-radius: var(--radius-sm);
+    padding: 12px 14px; font-family: var(--mono); font-size: 14.5px; outline:none;
+    transition: border-color .15s ease, box-shadow .15s ease;
+  }
+  .seed-row input[type="text"]:focus{ border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-glow); }
+
+  button.icon-btn{
+    appearance:none; cursor:pointer;
+    background: var(--surface-2); color: var(--text-dim);
+    border: 1px solid var(--border); border-radius: var(--radius-sm);
+    width: 42px; height: 42px; flex: 0 0 auto;
+    display:flex; align-items:center; justify-content:center;
+    transition: color .15s ease, border-color .15s ease, background .15s ease, transform .1s ease;
+  }
+  button.icon-btn svg{ width: 17px; height: 17px; }
+  button.icon-btn:hover{ color: var(--text); border-color: var(--border-strong); background: var(--surface-3); }
+  button.icon-btn:active{ transform: scale(0.94); }
+  button.icon-btn.copied{ color: var(--accent); border-color: rgba(88,230,201,0.45); }
+
+  .pill-btn{
+    appearance:none; cursor:pointer; border:none;
+    display:inline-flex; align-items:center; gap:7px;
+    background: var(--surface-2); color: var(--text-dim);
+    border: 1px solid var(--border); border-radius: 999px;
+    padding: 8px 14px; font-family: var(--sans); font-size: 12.5px; font-weight:600;
+    transition: color .15s ease, border-color .15s ease, background .15s ease;
+  }
+  .pill-btn svg{ width: 14px; height:14px; }
+  .pill-btn:hover{ color:var(--text); border-color: var(--border-strong); }
+
+  .convert-row{ display:flex; justify-content:center; margin: 22px 0; }
+  .convert-btn{
+    appearance:none; border:none; cursor:pointer;
+    font-family: var(--sans); font-weight: 700; font-size: 15.5px;
+    padding: 15px 40px; border-radius: 999px;
+    display:flex; align-items:center; gap:10px;
+    color: #06110d;
+    background: linear-gradient(135deg, var(--accent), #38b6a0);
+    box-shadow: 0 10px 30px -8px var(--accent-glow), 0 0 0 1px rgba(88,230,201,0.4) inset;
+    transition: transform .12s ease, box-shadow .2s ease, filter .15s ease;
+  }
+  .convert-btn svg{ width: 18px; height: 18px; }
+  .convert-btn:hover{ filter: brightness(1.06); }
+  .convert-btn:active{ transform: translateY(1px) scale(0.99); }
+  .convert-btn.mode-decrypt{
+    color: #1c1204;
+    background: linear-gradient(135deg, var(--accent2), #c98a34);
+    box-shadow: 0 10px 30px -8px var(--accent2-glow), 0 0 0 1px rgba(242,178,92,0.4) inset;
+  }
+  .convert-btn:disabled{ opacity: 0.5; cursor:not-allowed; filter:none; transform:none; }
+
+  .error-banner{
+    display:flex; align-items:flex-start; gap:10px;
+    background: rgba(242,112,92,0.09);
+    border: 1px solid rgba(242,112,92,0.35);
+    color: #ffb6a8;
+    border-radius: var(--radius-sm);
+    padding: 12px 14px; font-size: 13.5px; margin-bottom: 16px;
+    line-height:1.55;
+  }
+  .error-banner svg{ width:17px; height:17px; flex:0 0 auto; margin-top:1px; color: var(--danger); }
+  .hidden{ display:none !important; }
+
+  /* ---------- Details / accordion ---------- */
+  .details-toggle{
+    display:flex; align-items:center; gap:8px; justify-content:center;
+    width:100%; background:none; border:none; cursor:pointer;
+    color: var(--text-dim); font-family: var(--mono); font-size: 12.5px; letter-spacing:0.03em;
+    padding: 10px; margin-top: 4px;
+  }
+  .details-toggle svg{ width:14px; height:14px; transition: transform .2s ease; }
+  .details-toggle:hover{ color: var(--text); }
+  .details-toggle.open svg{ transform: rotate(180deg); }
+
+  .details-body{
+    max-height:0; overflow:hidden; transition: max-height .28s ease;
+  }
+  .details-inner{ padding-top: 14px; display:grid; gap: 12px; }
+  .byte-block{
+    background: var(--bg); border:1px solid var(--border); border-radius: var(--radius-sm);
+    padding: 12px 14px;
+  }
+  .byte-block-head{
+    display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;
+  }
+  .byte-block-head h4{
+    margin:0; font-size: 11.5px; letter-spacing:0.05em; color: var(--text-dim);
+    font-family: var(--mono); text-transform: uppercase; font-weight:600;
+  }
+  .byte-block code{
+    display:block; font-family: var(--mono); font-size: 12.5px; color: var(--accent);
+    word-break: break-all; line-height: 1.7; white-space: pre-wrap;
+  }
+  .byte-block .truncated-note{
+    display:block; margin-top:6px; color: var(--text-faint); font-size:11px; font-family: var(--mono);
+  }
+
+  .footer-note{
+    text-align:center; color: var(--text-faint); font-size:12px; font-family: var(--mono);
+    margin-top: 30px; line-height: 1.8;
+  }
+
+  .toast{
+    position: fixed; bottom: 26px; left: 50%; transform: translateX(-50%) translateY(20px);
+    background: var(--surface-3); color: var(--text); border:1px solid var(--border-strong);
+    padding: 11px 20px; border-radius: 999px; font-size: 13px; font-family: var(--sans); font-weight:600;
+    display:flex; align-items:center; gap:8px;
+    box-shadow: 0 12px 30px rgba(0,0,0,0.4);
+    opacity:0; pointer-events:none; transition: opacity .2s ease, transform .2s ease;
+    z-index: 50;
+  }
+  .toast svg{ width:15px; height:15px; color: var(--accent); }
+  .toast.show{ opacity:1; transform: translateX(-50%) translateY(0); pointer-events:auto; }
+
+  @media (max-width: 620px){
+    .wrap{ padding: 26px 16px 60px; }
+    header.top{ flex-direction:column; }
+    .signal .node{ width: 74px; }
+    .signal .track{ max-width: 40px; min-width: 16px; }
+    .convert-btn{ padding: 14px 26px; font-size: 14.5px; width:100%; justify-content:center; }
+    .brand-text h1{ font-size: 19px; }
+  }
+  @media (prefers-reduced-motion: reduce){
+    .signal .track .pulse{ animation: none !important; }
+    *{ transition-duration: 0.01ms !important; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="top">
+    <div class="brand">
+      <div class="brand-mark">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="color:var(--accent)">
+          <path d="M4 12h3l2 5 4-16 2 11 2-5h3"/>
+        </svg>
+      </div>
+      <div class="brand-text">
+        <p class="eyebrow" data-i18n="eyebrow">SEED-BASED REVERSIBLE ENCODING</p>
+        <h1 data-i18n="title">文字化けサイファー</h1>
+        <p data-i18n="subtitle">同じSeedを使えば、いつでも元の文字列に戻せます。</p>
+      </div>
+    </div>
+    <div class="lang-switch" role="group" aria-label="language">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.7 3.8 6 3.8 9s-1.3 6.3-3.8 9c-2.5-2.7-3.8-6-3.8-9s1.3-6.3 3.8-9z"/></svg>
+      <button class="lang-btn" data-lang="ja">JA</button>
+      <button class="lang-btn" data-lang="en">EN</button>
+      <button class="lang-btn" data-lang="zh">中文</button>
+    </div>
+  </header>
+
+  <div class="mode-row">
+    <div class="mode-toggle" role="tablist">
+      <button class="mode-btn" data-mode="encrypt" role="tab">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>
+        <span data-i18n="modeEncrypt">暗号化</span>
+      </button>
+      <button class="mode-btn" data-mode="decrypt" role="tab">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 7.5-2M8 10h8"/></svg>
+        <span data-i18n="modeDecrypt">復号</span>
+      </button>
+    </div>
+  </div>
+
+  <div class="signal" id="signal">
+    <div class="node" data-stage="input">
+      <div class="dot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h16M4 18h10"/></svg></div>
+      <span data-i18n="stageInput">入力</span>
+    </div>
+    <div class="track"><div class="pulse"></div></div>
+    <div class="node" data-stage="seed">
+      <div class="dot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l2-7 4 14 2-7h6"/></svg></div>
+      <span data-i18n="stageSeed">Seed / PRNG</span>
+    </div>
+    <div class="track"><div class="pulse"></div></div>
+    <div class="node" data-stage="output">
+      <div class="dot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg></div>
+      <span data-i18n="stageOutput">出力</span>
+    </div>
+  </div>
+
+  <div id="errorBanner" class="error-banner hidden">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/></svg>
+    <span id="errorText"></span>
+  </div>
+
+  <!-- Input panel -->
+  <div class="panel">
+    <div class="panel-head">
+      <label id="inputLabel" data-i18n="inputLabelEncrypt">入力文字列</label>
+      <div class="stats">
+        <span><span id="inputCharCount">0</span> <span data-i18n="charCountLabel">文字</span></span>
+        <span><span id="inputByteCount">0</span> <span data-i18n="byteCountLabel">バイト</span></span>
+      </div>
+    </div>
+    <textarea id="inputText" data-i18n-placeholder="inputPlaceholderEncrypt" placeholder="変換したい文字列を入力してください" spellcheck="false"></textarea>
+    <div class="field-tools">
+      <button class="icon-btn" id="copyInputBtn" data-copy-target="inputText" title="コピー" data-i18n-title="copyBtn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <!-- Seed panel -->
+  <div class="panel">
+    <div class="panel-head">
+      <label data-i18n="seedLabel">Seed</label>
+    </div>
+    <div class="seed-row">
+      <input type="text" id="seedInput" data-i18n-placeholder="seedPlaceholder" placeholder="任意の文字列または数値" spellcheck="false" autocomplete="off">
+      <button class="icon-btn" id="randomSeedBtn" title="ランダムなSeedを生成" data-i18n-title="randomSeedBtn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8.5" cy="8.5" r="1.2" fill="currentColor" stroke="none"/><circle cx="15.5" cy="8.5" r="1.2" fill="currentColor" stroke="none"/><circle cx="8.5" cy="15.5" r="1.2" fill="currentColor" stroke="none"/><circle cx="15.5" cy="15.5" r="1.2" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.2" fill="currentColor" stroke="none"/></svg>
+      </button>
+      <button class="icon-btn" id="copySeedBtn" data-copy-target="seedInput" title="コピー" data-i18n-title="copyBtn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <div class="convert-row">
+    <button class="convert-btn" id="convertBtn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 4 14h7l-1 8 9-12h-7l1-8z"/></svg>
+      <span id="convertBtnLabel" data-i18n="convertBtnEncrypt">文字化けを実行</span>
+    </button>
+  </div>
+
+  <!-- Output panel -->
+  <div class="panel">
+    <div class="panel-head">
+      <label id="outputLabel" data-i18n="outputLabelEncrypt">文字化け文字列</label>
+      <div class="stats">
+        <span><span id="outputCharCount">0</span> <span data-i18n="charCountLabel">文字</span></span>
+        <span><span id="outputByteCount">0</span> <span data-i18n="byteCountLabel">バイト</span></span>
+      </div>
+    </div>
+    <textarea id="outputText" readonly data-i18n-placeholder="outputPlaceholder" placeholder="ここに結果が表示されます" spellcheck="false"></textarea>
+    <div class="field-tools">
+      <button class="icon-btn" id="copyOutputBtn" data-copy-target="outputText" title="コピー" data-i18n-title="copyBtn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <button class="details-toggle" id="detailsToggle">
+    <span data-i18n="detailsToggle">処理の詳細を見る</span>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+  </button>
+  <div class="details-body" id="detailsBody">
+    <div class="details-inner">
+      <div class="byte-block">
+        <div class="byte-block-head"><h4 data-i18n="detailsUtf8">① UTF-8バイト列</h4></div>
+        <code id="detailUtf8">—</code>
+        <span class="truncated-note hidden" id="truncUtf8" data-i18n="truncatedNote">（先頭64バイトのみ表示）</span>
+      </div>
+      <div class="byte-block">
+        <div class="byte-block-head"><h4 data-i18n="detailsPrng">② PRNGバイト列（Seed由来）</h4></div>
+        <code id="detailPrng">—</code>
+        <span class="truncated-note hidden" id="truncPrng" data-i18n="truncatedNote">（先頭64バイトのみ表示）</span>
+      </div>
+      <div class="byte-block">
+        <div class="byte-block-head"><h4 data-i18n="detailsXor">③ XOR後バイト列</h4></div>
+        <code id="detailXor">—</code>
+        <span class="truncated-note hidden" id="truncXor" data-i18n="truncatedNote">（先頭64バイトのみ表示）</span>
+      </div>
+      <div class="byte-block">
+        <div class="byte-block-head"><h4 data-i18n="detailsMapped">④ 文字化け文字への割当</h4></div>
+        <code id="detailMapped">—</code>
+        <span class="truncated-note hidden" id="truncMapped" data-i18n="truncatedNote">（先頭64バイトのみ表示）</span>
+      </div>
+    </div>
+  </div>
+
+  <p class="footer-note" data-i18n="footerNote">UTF-8 → PRNG → XOR → 独自マッピングによる、完全可逆な変換方式です。</p>
+</div>
+
+<div class="toast" id="toast">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+  <span id="toastText"></span>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  /* ============================================================
+   * i18n
+   * ============================================================ */
+  var I18N = {
+    ja: {
+      eyebrow: "SEEDによる可逆な文字化け変換",
+      title: "文字化けサイファー",
+      subtitle: "同じSeedを使えば、いつでも元の文字列に戻せます。",
+      modeEncrypt: "暗号化",
+      modeDecrypt: "復号",
+      stageInput: "入力",
+      stageSeed: "Seed / PRNG",
+      stageOutput: "出力",
+      inputLabelEncrypt: "入力文字列",
+      inputLabelDecrypt: "文字化け文字列",
+      inputPlaceholderEncrypt: "変換したい文字列を入力してください",
+      inputPlaceholderDecrypt: "復号したい文字化け文字列を貼り付けてください",
+      seedLabel: "Seed",
+      seedPlaceholder: "任意の文字列または数値",
+      randomSeedBtn: "ランダムなSeedを生成",
+      convertBtnEncrypt: "文字化けを実行",
+      convertBtnDecrypt: "復号を実行",
+      outputLabelEncrypt: "文字化け文字列",
+      outputLabelDecrypt: "復元された文字列",
+      outputPlaceholder: "ここに結果が表示されます",
+      copyBtn: "コピー",
+      copiedToast: "コピーしました",
+      detailsToggle: "処理の詳細を見る",
+      detailsUtf8: "① UTF-8バイト列",
+      detailsPrng: "② PRNGバイト列（Seed由来）",
+      detailsXor: "③ XOR後バイト列",
+      detailsMapped: "④ 文字化け文字への割当",
+      truncatedNote: "（先頭64バイトのみ表示）",
+      errorEmptyInput: "文字列を入力してください。",
+      errorEmptySeed: "Seedを入力してください。",
+      errorDecodeFailed: "復号に失敗しました。文字化け文字列とSeedが正しいか確認してください。",
+      errorInvalidChar: "この文字化け文字列には、このシステムで生成されたものではない文字が含まれています。",
+      footerNote: "UTF-8 → PRNG → XOR → 独自マッピングによる、完全可逆な変換方式です。",
+      charCountLabel: "文字",
+      byteCountLabel: "バイト"
+    },
+    en: {
+      eyebrow: "SEED-BASED REVERSIBLE ENCODING",
+      title: "Mojibake Cipher",
+      subtitle: "Use the same seed and you can always restore the original text.",
+      modeEncrypt: "Encrypt",
+      modeDecrypt: "Decrypt",
+      stageInput: "Input",
+      stageSeed: "Seed / PRNG",
+      stageOutput: "Output",
+      inputLabelEncrypt: "Input text",
+      inputLabelDecrypt: "Garbled text",
+      inputPlaceholderEncrypt: "Enter the text you want to scramble",
+      inputPlaceholderDecrypt: "Paste the garbled text you want to restore",
+      seedLabel: "Seed",
+      seedPlaceholder: "Any text or number",
+      randomSeedBtn: "Generate a random seed",
+      convertBtnEncrypt: "Scramble",
+      convertBtnDecrypt: "Restore",
+      outputLabelEncrypt: "Garbled text",
+      outputLabelDecrypt: "Restored text",
+      outputPlaceholder: "The result will appear here",
+      copyBtn: "Copy",
+      copiedToast: "Copied",
+      detailsToggle: "View processing details",
+      detailsUtf8: "① UTF-8 byte sequence",
+      detailsPrng: "② PRNG byte sequence (derived from seed)",
+      detailsXor: "③ Byte sequence after XOR",
+      detailsMapped: "④ Mapping to garbled characters",
+      truncatedNote: "(showing first 64 bytes only)",
+      errorEmptyInput: "Please enter some text.",
+      errorEmptySeed: "Please enter a seed.",
+      errorDecodeFailed: "Restoration failed. Please check that the garbled text and seed are correct.",
+      errorInvalidChar: "This garbled text contains characters that were not produced by this system.",
+      footerNote: "A fully reversible transformation: UTF-8 → PRNG → XOR → custom character mapping.",
+      charCountLabel: "chars",
+      byteCountLabel: "bytes"
+    },
+    zh: {
+      eyebrow: "基于SEED的可逆乱码转换",
+      title: "乱码密码机",
+      subtitle: "只要使用相同的Seed，随时都能还原成原始文本。",
+      modeEncrypt: "加密",
+      modeDecrypt: "解密",
+      stageInput: "输入",
+      stageSeed: "Seed / PRNG",
+      stageOutput: "输出",
+      inputLabelEncrypt: "输入文本",
+      inputLabelDecrypt: "乱码文本",
+      inputPlaceholderEncrypt: "请输入要转换的文本",
+      inputPlaceholderDecrypt: "请粘贴要还原的乱码文本",
+      seedLabel: "Seed",
+      seedPlaceholder: "任意文本或数字",
+      randomSeedBtn: "生成随机Seed",
+      convertBtnEncrypt: "生成乱码",
+      convertBtnDecrypt: "还原文本",
+      outputLabelEncrypt: "乱码文本",
+      outputLabelDecrypt: "还原后的文本",
+      outputPlaceholder: "结果将显示在此处",
+      copyBtn: "复制",
+      copiedToast: "已复制",
+      detailsToggle: "查看处理详情",
+      detailsUtf8: "① UTF-8 字节序列",
+      detailsPrng: "② PRNG 字节序列（源自Seed）",
+      detailsXor: "③ 异或后的字节序列",
+      detailsMapped: "④ 映射为乱码字符",
+      truncatedNote: "（仅显示前64字节）",
+      errorEmptyInput: "请输入文本。",
+      errorEmptySeed: "请输入Seed。",
+      errorDecodeFailed: "还原失败，请检查乱码文本和Seed是否正确。",
+      errorInvalidChar: "该乱码文本中包含并非由本系统生成的字符。",
+      footerNote: "完全可逆的转换方式：UTF-8 → PRNG → 异或 → 自定义字符映射。",
+      charCountLabel: "字符",
+      byteCountLabel: "字节"
+    }
+  };
+
+  function detectLang(){
+    var langs = navigator.languages && navigator.languages.length ? navigator.languages : [navigator.language || "en"];
+    for (var i=0;i<langs.length;i++){
+      var l = (langs[i]||"").toLowerCase();
+      if (l.indexOf("ja") === 0) return "ja";
+      if (l.indexOf("zh") === 0) return "zh";
+      if (l.indexOf("en") === 0) return "en";
+    }
+    return "en"; // fallback
+  }
+
+  var state = {
+    lang: detectLang(),
+    mode: "encrypt" // or "decrypt"
+  };
+  if (!I18N[state.lang]) state.lang = "en";
+
+  function t(key){
+    var dict = I18N[state.lang] || I18N.en;
+    return (dict && dict[key] != null) ? dict[key] : (I18N.en[key] || key);
+  }
+
+  function applyI18n(){
+    document.documentElement.lang = state.lang;
+    var nodes = document.querySelectorAll("[data-i18n]");
+    for (var i=0;i<nodes.length;i++){
+      nodes[i].textContent = t(nodes[i].getAttribute("data-i18n"));
+    }
+    var placeholders = document.querySelectorAll("[data-i18n-placeholder]");
+    for (var j=0;j<placeholders.length;j++){
+      placeholders[j].setAttribute("placeholder", t(placeholders[j].getAttribute("data-i18n-placeholder")));
+    }
+    var titles = document.querySelectorAll("[data-i18n-title]");
+    for (var k=0;k<titles.length;k++){
+      titles[k].setAttribute("title", t(titles[k].getAttribute("data-i18n-title")));
+    }
+    document.querySelectorAll(".lang-btn").forEach(function(btn){
+      btn.classList.toggle("active", btn.getAttribute("data-lang") === state.lang);
+    });
+    updateModeLabels();
+  }
+
+  function updateModeLabels(){
+    var inputLabel = document.getElementById("inputLabel");
+    var outputLabel = document.getElementById("outputLabel");
+    var inputText = document.getElementById("inputText");
+    var outputText = document.getElementById("outputText");
+    var convertLabel = document.getElementById("convertBtnLabel");
+    var convertBtn = document.getElementById("convertBtn");
+
+    if (state.mode === "encrypt"){
+      inputLabel.textContent = t("inputLabelEncrypt");
+      inputText.placeholder = t("inputPlaceholderEncrypt");
+      outputLabel.textContent = t("outputLabelEncrypt");
+      outputText.placeholder = t("outputPlaceholder");
+      convertLabel.textContent = t("convertBtnEncrypt");
+      convertBtn.classList.remove("mode-decrypt");
+    } else {
+      inputLabel.textContent = t("inputLabelDecrypt");
+      inputText.placeholder = t("inputPlaceholderDecrypt");
+      outputLabel.textContent = t("outputLabelDecrypt");
+      outputText.placeholder = t("outputPlaceholder");
+      convertLabel.textContent = t("convertBtnDecrypt");
+      convertBtn.classList.add("mode-decrypt");
+    }
+  }
+
+  /* ============================================================
+   * Seeded PRNG (xmur3 hash -> mulberry32 generator)
+   * ============================================================ */
+  function xmur3(str){
+    var h = 1779033703 ^ str.length;
+    for (var i = 0; i < str.length; i++) {
+      h = Math.imul(h ^ str.charCodeAt(i), 3432918353);
+      h = (h << 13) | (h >>> 19);
+    }
+    return function(){
+      h = Math.imul(h ^ (h >>> 16), 2246822507);
+      h = Math.imul(h ^ (h >>> 13), 3266489909);
+      h ^= h >>> 16;
+      return h >>> 0;
+    };
+  }
+  function mulberry32(a){
+    return function(){
+      a |= 0; a = (a + 0x6D2B79F5) | 0;
+      var t = Math.imul(a ^ (a >>> 15), 1 | a);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+  function prngBytes(seedStr, length){
+    var seedFn = xmur3(String(seedStr));
+    var rand = mulberry32(seedFn());
+    // warm up the generator a little so short seeds don't produce an
+    // immediately-obvious first byte
+    for (var w = 0; w < 8; w++) rand();
+    var out = new Uint8Array(length);
+    for (var i = 0; i < length; i++){
+      out[i] = Math.floor(rand() * 256) & 0xFF;
+    }
+    return out;
+  }
+
+  /* ============================================================
+   * Custom "garbled character" bijective mapping
+   * Maps a 16-bit value (0-65535) <-> a single Unicode code point,
+   * skipping the UTF-16 surrogate range so every mapped value is a
+   * single, valid, displayable character. This is the "独自方式"
+   * (custom scheme) referenced in the design as an alternative to a
+   * literal Shift_JIS re-interpretation.
+   * ============================================================ */
+  var MAP_BASE = 0x4E00;      // start of CJK Unified Ideographs
+  var SURROGATE_START = 0xD800;
+  var SURROGATE_SPAN = 0x800; // 2048 code points to skip
+
+  function valueToCodePoint(v){
+    var cp = MAP_BASE + v;
+    if (cp >= SURROGATE_START) cp += SURROGATE_SPAN;
+    return cp;
+  }
+  function codePointToValue(cp){
+    if (cp < MAP_BASE) return -1;
+    if (cp < 0xE000){
+      var v = cp - MAP_BASE;
+      if (v > 0xFFFF) return -1;
+      return v;
+    }
+    var v2 = cp - MAP_BASE - SURROGATE_SPAN;
+    if (v2 < 0 || v2 > 0xFFFF) return -1;
+    return v2;
+  }
+
+  /* ============================================================
+   * Byte <-> hex helpers
+   * ============================================================ */
+  function bytesToHex(bytes, limit){
+    var n = Math.min(bytes.length, limit || bytes.length);
+    var parts = [];
+    for (var i = 0; i < n; i++){
+      parts.push(bytes[i].toString(16).toUpperCase().padStart(2, "0"));
+    }
+    return { text: parts.join(" "), truncated: bytes.length > n };
+  }
+
+  /* ============================================================
+   * Core encode / decode
+   * ============================================================ */
+  function u32ToBytes(n){
+    return new Uint8Array([
+      (n >>> 24) & 0xFF,
+      (n >>> 16) & 0xFF,
+      (n >>> 8) & 0xFF,
+      n & 0xFF
+    ]);
+  }
+  function bytesToU32(b, offset){
+    return ((b[offset] << 24) | (b[offset+1] << 16) | (b[offset+2] << 8) | (b[offset+3])) >>> 0;
+  }
+
+  function encodeText(text, seedStr){
+    var utf8 = new TextEncoder().encode(text);
+    var header = u32ToBytes(utf8.length);
+    var bodyLen = header.length + utf8.length;
+    var padded = bodyLen % 2 !== 0;
+    var combined = new Uint8Array(padded ? bodyLen + 1 : bodyLen);
+    combined.set(header, 0);
+    combined.set(utf8, header.length);
+    if (padded) combined[combined.length - 1] = 0;
+
+    var rand = prngBytes(seedStr, combined.length);
+    var xored = new Uint8Array(combined.length);
+    for (var i = 0; i < combined.length; i++) xored[i] = combined[i] ^ rand[i];
+
+    var codePoints = [];
+    for (var p = 0; p < xored.length; p += 2){
+      var v = (xored[p] << 8) | xored[p+1];
+      codePoints.push(valueToCodePoint(v));
+    }
+    var garbled = codePointsToString(codePoints);
+
+    return {
+      result: garbled,
+      utf8: utf8,
+      rand: rand,
+      xored: xored,
+      codePoints: codePoints
+    };
+  }
+
+  function codePointsToString(codePoints){
+    var CHUNK = 5000;
+    var out = "";
+    for (var i = 0; i < codePoints.length; i += CHUNK){
+      out += String.fromCodePoint.apply(null, codePoints.slice(i, i + CHUNK));
+    }
+    return out;
+  }
+
+  function decodeText(garbled, seedStr){
+    var chars = Array.from(garbled);
+    var codePoints = [];
+    var xored = new Uint8Array(chars.length * 2);
+    for (var i = 0; i < chars.length; i++){
+      var cp = chars[i].codePointAt(0);
+      codePoints.push(cp);
+      var v = codePointToValue(cp);
+      if (v < 0){
+        var err = new Error("INVALID_CHAR");
+        err.code = "INVALID_CHAR";
+        throw err;
+      }
+      xored[i*2] = (v >> 8) & 0xFF;
+      xored[i*2 + 1] = v & 0xFF;
+    }
+
+    var rand = prngBytes(seedStr, xored.length);
+    var combined = new Uint8Array(xored.length);
+    for (var j = 0; j < xored.length; j++) combined[j] = xored[j] ^ rand[j];
+
+    if (combined.length < 4){
+      var err2 = new Error("DECODE_FAILED");
+      err2.code = "DECODE_FAILED";
+      throw err2;
+    }
+    var origLen = bytesToU32(combined, 0);
+    if (origLen < 0 || origLen > combined.length - 4){
+      var err3 = new Error("DECODE_FAILED");
+      err3.code = "DECODE_FAILED";
+      throw err3;
+    }
+    var utf8Bytes = combined.slice(4, 4 + origLen);
+    var text;
+    try{
+      text = new TextDecoder("utf-8", { fatal: true }).decode(utf8Bytes);
+    } catch(e){
+      var err4 = new Error("DECODE_FAILED");
+      err4.code = "DECODE_FAILED";
+      throw err4;
+    }
+
+    return {
+      result: text,
+      utf8: utf8Bytes,
+      rand: rand,
+      xored: xored,
+      codePoints: codePoints
+    };
+  }
+
+  /* ============================================================
+   * UI wiring
+   * ============================================================ */
+  var els = {};
+  ["inputText","seedInput","outputText","convertBtn","convertBtnLabel",
+   "errorBanner","errorText","inputCharCount","inputByteCount",
+   "outputCharCount","outputByteCount","detailsToggle","detailsBody",
+   "detailUtf8","detailPrng","detailXor","detailMapped",
+   "truncUtf8","truncPrng","truncXor","truncMapped",
+   "toast","toastText","randomSeedBtn","signal"
+  ].forEach(function(id){ els[id] = document.getElementById(id); });
+
+  function byteLenOf(str){
+    return new TextEncoder().encode(str).length;
+  }
+  function refreshCounts(){
+    var inputVal = els.inputText.value;
+    var outputVal = els.outputText.value;
+    els.inputCharCount.textContent = Array.from(inputVal).length;
+    els.inputByteCount.textContent = byteLenOf(inputVal);
+    els.outputCharCount.textContent = Array.from(outputVal).length;
+    els.outputByteCount.textContent = byteLenOf(outputVal);
+  }
+
+  function showError(msg){
+    els.errorText.textContent = msg;
+    els.errorBanner.classList.remove("hidden");
+  }
+  function clearError(){
+    els.errorBanner.classList.add("hidden");
+  }
+
+  function setDetail(elText, elTrunc, bytes){
+    var hex = bytesToHex(bytes, 64);
+    elText.textContent = hex.text || "—";
+    elTrunc.classList.toggle("hidden", !hex.truncated);
+  }
+  function setMappedDetail(codePoints){
+    var limit = 64;
+    var n = Math.min(codePoints.length, limit);
+    var str = codePointsToString(codePoints.slice(0, n));
+    els.detailMapped.textContent = str || "—";
+    els.truncMapped.classList.toggle("hidden", codePoints.length <= limit);
+  }
+  function clearDetails(){
+    [els.detailUtf8, els.detailPrng, els.detailXor, els.detailMapped].forEach(function(el){ el.textContent = "—"; });
+    [els.truncUtf8, els.truncPrng, els.truncXor, els.truncMapped].forEach(function(el){ el.classList.add("hidden"); });
+  }
+
+  function runConversion(){
+    clearError();
+    var inputVal = els.inputText.value;
+    var seedVal = els.seedInput.value;
+
+    if (inputVal.length === 0){ showError(t("errorEmptyInput")); return; }
+    if (seedVal.length === 0){ showError(t("errorEmptySeed")); return; }
+
+    var data;
+    try{
+      if (state.mode === "encrypt"){
+        data = encodeText(inputVal, seedVal);
+      } else {
+        data = decodeText(inputVal, seedVal);
+      }
+    } catch(e){
+      if (e && e.code === "INVALID_CHAR"){
+        showError(t("errorInvalidChar"));
+      } else {
+        showError(t("errorDecodeFailed"));
+      }
+      els.outputText.value = "";
+      clearDetails();
+      refreshCounts();
+      return;
+    }
+
+    els.outputText.value = data.result;
+    refreshCounts();
+
+    setDetail(els.detailUtf8, els.truncUtf8, data.utf8);
+    setDetail(els.detailPrng, els.truncPrng, data.rand);
+    setDetail(els.detailXor, els.truncXor, data.xored);
+    setMappedDetail(data.codePoints);
+
+    playSignal();
+  }
+
+  function playSignal(){
+    var el = els.signal;
+    el.classList.remove("running", "decrypt-run");
+    void el.offsetWidth; // restart animation
+    el.classList.add(state.mode === "encrypt" ? "running" : "decrypt-run");
+    var nodes = el.querySelectorAll(".node");
+    nodes.forEach(function(n){ n.classList.remove("active"); });
+    var i = 0;
+    var order = el.querySelectorAll(".node");
+    function step(){
+      order.forEach(function(n){ n.classList.remove("active"); });
+      if (order[i]) order[i].classList.add("active");
+      i++;
+      if (i < order.length) setTimeout(step, 380);
+    }
+    step();
+  }
+
+  var toastTimer = null;
+  function showToast(msg){
+    els.toastText.textContent = msg;
+    els.toast.classList.add("show");
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function(){ els.toast.classList.remove("show"); }, 1600);
+  }
+
+  function copyFromField(fieldId, btn){
+    var field = document.getElementById(fieldId);
+    var value = field.value;
+    if (!value){ return; }
+    var done = function(){
+      showToast(t("copiedToast"));
+      btn.classList.add("copied");
+      setTimeout(function(){ btn.classList.remove("copied"); }, 1100);
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(value).then(done).catch(function(){ legacyCopy(field, done); });
+    } else {
+      legacyCopy(field, done);
+    }
+  }
+  function legacyCopy(field, done){
+    var wasReadonly = field.hasAttribute("readonly");
+    field.removeAttribute("readonly");
+    field.focus(); field.select();
+    try{ document.execCommand("copy"); done(); } catch(e){}
+    if (wasReadonly) field.setAttribute("readonly", "readonly");
+  }
+
+  function randomSeed(){
+    var chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+    var arr = new Uint32Array(16);
+    if (window.crypto && window.crypto.getRandomValues) window.crypto.getRandomValues(arr);
+    else for (var i=0;i<arr.length;i++) arr[i] = Math.floor(Math.random()*4294967295);
+    var out = "";
+    for (var j=0;j<16;j++) out += chars[arr[j] % chars.length];
+    return out;
+  }
+
+  /* ---------- Event bindings ---------- */
+  document.querySelectorAll(".lang-btn").forEach(function(btn){
+    btn.addEventListener("click", function(){
+      state.lang = btn.getAttribute("data-lang");
+      applyI18n();
+    });
+  });
+
+  document.querySelectorAll(".mode-btn").forEach(function(btn){
+    btn.addEventListener("click", function(){
+      state.mode = btn.getAttribute("data-mode");
+      document.querySelectorAll(".mode-btn").forEach(function(b){ b.classList.toggle("active", b === btn); });
+      updateModeLabels();
+      clearError();
+      els.outputText.value = "";
+      clearDetails();
+      refreshCounts();
+    });
+  });
+  // set initial active mode button
+  document.querySelector('.mode-btn[data-mode="encrypt"]').classList.add("active");
+
+  els.convertBtn.addEventListener("click", runConversion);
+
+  document.querySelectorAll("[data-copy-target]").forEach(function(btn){
+    btn.addEventListener("click", function(){
+      copyFromField(btn.getAttribute("data-copy-target"), btn);
+    });
+  });
+
+  els.randomSeedBtn.addEventListener("click", function(){
+    els.seedInput.value = randomSeed();
+  });
+
+  els.inputText.addEventListener("input", refreshCounts);
+  els.outputText.addEventListener("input", refreshCounts);
+
+  els.detailsToggle.addEventListener("click", function(){
+    var open = els.detailsToggle.classList.toggle("open");
+    if (open){
+      els.detailsBody.style.maxHeight = els.detailsBody.scrollHeight + "px";
+    } else {
+      els.detailsBody.style.maxHeight = "0px";
+    }
+  });
+
+  window.addEventListener("resize", function(){
+    if (els.detailsToggle.classList.contains("open")){
+      els.detailsBody.style.maxHeight = els.detailsBody.scrollHeight + "px";
+    }
+  });
+
+  // Enter key (with modifier) triggers conversion from either field
+  [els.inputText, els.seedInput].forEach(function(f){
+    f.addEventListener("keydown", function(e){
+      if ((e.metaKey || e.ctrlKey) && e.key === "Enter"){
+        e.preventDefault();
+        runConversion();
+      }
+    });
+  });
+
+  /* ---------- Init ---------- */
+  applyI18n();
+  refreshCounts();
+})();
+</script>
+</body>
+</html>
