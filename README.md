@@ -1,14 +1,14 @@
 # Mojibake Cipher
 
 > A seed-based reversible mojibake cipher that transforms text into garbled characters and restores it with the same seed.
-<img width="1353" height="619" alt="image" src="https://github.com/user-attachments/assets/5ae02858-6ede-42ad-a23a-dd13a282d797" />
-<img width="1353" height="619" alt="image" src="https://github.com/user-attachments/assets/6215092d-45a6-4ed2-b2b3-08ffad3c92b7" />
-
-
 
 ![License](https://img.shields.io/badge/License-MIT-green)
 ![JavaScript](https://img.shields.io/badge/JavaScript-ES6-yellow)
 ![Status](https://img.shields.io/badge/Status-Stable-brightgreen)
+
+<img width="1353" height="619" alt="image" src="https://github.com/user-attachments/assets/5ae02858-6ede-42ad-a23a-dd13a282d797" />
+<img width="1353" height="619" alt="image" src="https://github.com/user-attachments/assets/6215092d-45a6-4ed2-b2b3-08ffad3c92b7" />
+
 
 ## ✨ Features
 
